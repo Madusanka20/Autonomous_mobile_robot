@@ -3,142 +3,96 @@
 #include <queue>
 #include <cmath>
 #include <unordered_map>
+#include <sstream>
 #include <algorithm>
-#include <functional>
 
-// Define a structure to represent a node in the grid
 struct Node {
-    int x, y;       // Coordinates
-    double g, h, f; // Cost values (g = cost from start, h = heuristic to goal, f = g + h)
-    Node* parent;   // Parent node for path reconstruction
+    int x, y;
+    double g, h, f;
+    Node* parent;
 
     Node(int x, int y, Node* parent = nullptr) : x(x), y(y), g(0), h(0), f(0), parent(parent) {}
 
-    // Overload the == operator for comparing nodes
-    bool operator==(const Node& other) const {
-        return x == other.x && y == other.y;
-    }
-
-    // Overload the < operator for priority queue
-    bool operator<(const Node& other) const {
-        return f > other.f; // For min-heap
+    bool operator>(const Node& other) const {
+        return f > other.f;
     }
 };
 
-// Hash function for Node to use in unordered_map
-namespace std {
-    template<> 
-    struct hash<Node> {
-        size_t operator()(const Node& node) const {
-            return hash<int>()(node.x) ^ hash<int>()(node.y);
-        }
-    };
+std::string getKey(int x, int y) {
+    std::stringstream ss;
+    ss << x << "," << y;
+    return ss.str();
 }
 
-class AStarPlanner {
-private:
-    std::vector<std::vector<double>> costmap; // Your 2D costmap from SLAM
-    int width, height;
+bool isValid(int x, int y, const std::vector<std::vector<double>>& costmap) {
+    int rows = costmap.size();
+    int cols = costmap[0].size();
+    return x >= 0 && x < rows && y >= 0 && y < cols && costmap[x][y] < 1.0;
+}
 
-public:
-    AStarPlanner(const std::vector<std::vector<double>>& costmap) 
-        : costmap(costmap), width(costmap.size()), height(costmap[0].size()) {}
+double heuristic(int x1, int y1, int x2, int y2) {
+    return std::sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
 
-    // Heuristic function (Euclidean distance)
-    double heuristic(int x1, int y1, int x2, int y2) {
-        return std::sqrt(std::pow(x1 - x2, 2) + std::pow(y1 - y2, 2));
+std::vector<Node> reconstructPath(Node* node) {
+    std::vector<Node> path;
+    while (node != nullptr) {
+        path.push_back(*node);
+        node = node->parent;
     }
+    std::reverse(path.begin(), path.end());
+    return path;
+}
 
-    // Check if a cell is valid (within bounds and not obstructed)
-    bool isValid(int x, int y) {
-        return x >= 0 && x < width && y >= 0 && y < height && costmap[x][y] < 1.0;
-    }
+std::vector<Node> aStar(const std::vector<std::vector<double>>& costmap, int startX, int startY, int goalX, int goalY) {
+    int dx[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+    int dy[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    double move_cost[] = {1.4, 1.0, 1.4, 1.0, 1.0, 1.4, 1.0, 1.4};
 
-    // A* path planning
-    std::vector<Node> findPath(int startX, int startY, int goalX, int goalY) {
-        // Priority queue for open nodes
-        std::priority_queue<Node> openSet;
-        
-        // Hash maps for open and closed sets
-        std::unordered_map<Node, double> openSetLookup;
-        std::unordered_map<Node, bool> closedSet;
+    std::priority_queue<Node, std::vector<Node>, std::greater<Node>> open;
+    std::unordered_map<std::string, bool> closed;
 
-        // Create start and goal nodes
-        Node start(startX, startY);
-        start.g = 0;
-        start.h = heuristic(startX, startY, goalX, goalY);
-        start.f = start.g + start.h;
+    Node* start = new Node(startX, startY);
+    start->g = 0;
+    start->h = heuristic(startX, startY, goalX, goalY);
+    start->f = start->g + start->h;
 
-        Node goal(goalX, goalY);
+    open.push(*start);
 
-        openSet.push(start);
-        openSetLookup[start] = start.f;
+    while (!open.empty()) {
+        Node current = open.top();
+        open.pop();
 
-        // Possible movement directions (8-connected grid)
-        const int dx[] = {-1, -1, -1, 0, 0, 1, 1, 1};
-        const int dy[] = {-1, 0, 1, -1, 1, -1, 0, 1};
-        const double move_cost[] = {1.414, 1.0, 1.414, 1.0, 1.0, 1.414, 1.0, 1.414}; // Diagonal costs more
+        std::string key = getKey(current.x, current.y);
+        if (closed[key]) continue;
+        closed[key] = true;
 
-        while (!openSet.empty()) {
-            Node current = openSet.top();
-            openSet.pop();
-
-            // Check if we've reached the goal
-            if (current.x == goal.x && current.y == goal.y) {
-                return reconstructPath(current);
-            }
-
-            closedSet[current] = true;
-
-            // Explore neighbors
-            for (int i = 0; i < 8; i++) {
-                int nx = current.x + dx[i];
-                int ny = current.y + dy[i];
-
-                if (!isValid(nx, ny)) continue;
-
-                Node neighbor(nx, ny, &current);
-                
-                // Skip if in closed set
-                if (closedSet.find(neighbor) != closedSet.end()) {
-                    continue;
-                }
-
-                // Calculate tentative g score
-                double tentative_g = current.g + move_cost[i] * costmap[nx][ny];
-
-                // Check if this path to neighbor is better
-                if (openSetLookup.find(neighbor) == openSetLookup.end() || tentative_g < neighbor.g) {
-                    neighbor.parent = &current;
-                    neighbor.g = tentative_g;
-                    neighbor.h = heuristic(nx, ny, goalX, goalY);
-                    neighbor.f = neighbor.g + neighbor.h;
-
-                    openSet.push(neighbor);
-                    openSetLookup[neighbor] = neighbor.f;
-                }
-            }
+        if (current.x == goalX && current.y == goalY) {
+            return reconstructPath(&current);
         }
 
-        // No path found
-        return std::vector<Node>();
+        for (int i = 0; i < 8; i++) {
+            int nx = current.x + dx[i];
+            int ny = current.y + dy[i];
+
+            if (!isValid(nx, ny, costmap)) continue;
+
+            std::string nkey = getKey(nx, ny);
+            if (closed[nkey]) continue;
+
+            Node* neighbor = new Node(nx, ny, new Node(current));
+            neighbor->g = current.g + move_cost[i] * costmap[nx][ny];
+            neighbor->h = heuristic(nx, ny, goalX, goalY);
+            neighbor->f = neighbor->g + neighbor->h;
+
+            open.push(*neighbor);
+        }
     }
 
-    // Reconstruct the path from goal to start
-    std::vector<Node> reconstructPath(Node current) {
-        std::vector<Node> path;
-        while (current.parent != nullptr) {
-            path.push_back(current);
-            current = *current.parent;
-        }
-        path.push_back(current); // Add the start node
-        std::reverse(path.begin(), path.end());
-        return path;
-    }
-};
+    return {};
+}
 
 int main() {
-    // Example costmap (0 = free, 1 = obstacle, values between represent cost)
     std::vector<std::vector<double>> costmap = {
         {0, 0, 0, 0, 0},
         {0, 1, 1, 0, 0},
@@ -147,10 +101,10 @@ int main() {
         {0, 0, 0, 0, 0}
     };
 
-    AStarPlanner planner(costmap);
+    int startX = 0, startY = 0;
+    int goalX = 4, goalY = 4;
 
-    // Start at (0, 0), goal at (4, 4)
-    auto path = planner.findPath(0, 0, 4, 4);
+    std::vector<Node> path = aStar(costmap, startX, startY, goalX, goalY);
 
     if (path.empty()) {
         std::cout << "No path found!" << std::endl;
