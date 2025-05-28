@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 
+// ======================= Node Structure ========================
 struct Node {
     int x, y;
     double g, h, f;
@@ -18,6 +19,7 @@ struct Node {
     }
 };
 
+// ======================= Helper Functions ========================
 std::string getKey(int x, int y) {
     std::stringstream ss;
     ss << x << "," << y;
@@ -44,6 +46,7 @@ std::vector<Node> reconstructPath(Node* node) {
     return path;
 }
 
+// ======================= A* Algorithm ========================
 std::vector<Node> aStar(const std::vector<std::vector<double>>& costmap, int startX, int startY, int goalX, int goalY) {
     int dx[] = {-1, -1, -1, 0, 0, 1, 1, 1};
     int dy[] = {-1, 0, 1, -1, 1, -1, 0, 1};
@@ -92,7 +95,12 @@ std::vector<Node> aStar(const std::vector<std::vector<double>>& costmap, int sta
     return {};
 }
 
+// ======================= Main ========================
 int main() {
+    int startX = 0, startY = 0;
+    int goalX = 3, goalY = 4;
+
+    // Initial Costmap
     std::vector<std::vector<double>> costmap = {
         {0, 0, 0, 0, 0},
         {0, 1, 1, 0, 0},
@@ -101,17 +109,37 @@ int main() {
         {0, 0, 0, 0, 0}
     };
 
-    int startX = 0, startY = 0;
-    int goalX = 3, goalY = 4;
+    for (int iteration = 0; iteration < 3; iteration++) {
+        std::cout << "\n--- Iteration " << iteration + 1 << " ---" << std::endl;
 
-    std::vector<Node> path = aStar(costmap, startX, startY, goalX, goalY);
+        // Modify costmap for demonstration (e.g. add/remove obstacles)
+        if (iteration == 1) {
+            costmap[2][2] = 1.0;  // Add obstacle
+        } else if (iteration == 2) {
+            costmap[1][1] = 0.0;  // Remove obstacle
+        }
 
-    if (path.empty()) {
-        std::cout << "No path found!" << std::endl;
-    } else {
-        std::cout << "Path found:" << std::endl;
-        for (const auto& node : path) {
-            std::cout << "(" << node.x << ", " << node.y << ")" << std::endl;
+        // Print current costmap
+        std::cout << "Costmap:" << std::endl;
+        for (const auto& row : costmap) {
+            for (double cost : row) {
+                std::cout << cost << " ";
+            }
+            std::cout << std::endl;
+        }
+
+        // Run A*
+        std::vector<Node> path = aStar(costmap, startX, startY, goalX, goalY);
+
+        // Show path
+        if (path.empty()) {
+            std::cout << "No path found!" << std::endl;
+        } else {
+            std::cout << "Path found:" << std::endl;
+            for (const auto& node : path) {
+                std::cout << "(" << node.x << ", " << node.y << ") ";
+            }
+            std::cout << std::endl;
         }
     }
 

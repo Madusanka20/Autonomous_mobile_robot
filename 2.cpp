@@ -92,6 +92,34 @@ std::vector<Node> aStar(const std::vector<std::vector<double>>& costmap, int sta
     return {};
 }
 
+// Function to check if movement is straight (same row or column)
+bool isStraightMovement(const Node& current, const Node& next) {
+    return (current.x == next.x || current.y == next.y);
+}
+
+// Function to generate velocity commands
+void generateVelocityCommands(const std::vector<Node>& path) {
+    if (path.size() < 2) {
+        std::cout << "No movement needed." << std::endl;
+        return;
+    }
+
+    for (size_t i = 0; i < path.size() - 1; ++i) {
+        const Node& current = path[i];
+        const Node& next = path[i + 1];
+
+        if (isStraightMovement(current, next)) {
+            std::cout << "Move from (" << current.x << ", " << current.y << ") to (" 
+                      << next.x << ", " << next.y << "): v = 0.07 m/s, w = 0 rad/s" << std::endl;
+        } else {
+            std::cout << "Rotate from (" << current.x << ", " << current.y << ") to (" 
+                      << next.x << ", " << next.y << "): v = 0 m/s, w = 0.5 rad/s" << std::endl;
+            std::cout << "Move from (" << current.x << ", " << current.y << ") to (" 
+                      << next.x << ", " << next.y << "): v = 0.07 m/s, w = 0 rad/s" << std::endl;
+        }
+    }
+}
+
 int main() {
     std::vector<std::vector<double>> costmap = {
         {0, 0, 0, 0, 0},
@@ -101,7 +129,7 @@ int main() {
         {0, 0, 0, 0, 0}
     };
 
-    int startX = 0, startY = 0;
+    int startX = 2, startY = 0;
     int goalX = 3, goalY = 4;
 
     std::vector<Node> path = aStar(costmap, startX, startY, goalX, goalY);
@@ -113,6 +141,9 @@ int main() {
         for (const auto& node : path) {
             std::cout << "(" << node.x << ", " << node.y << ")" << std::endl;
         }
+
+        std::cout << "\nVelocity Commands:" << std::endl;
+        generateVelocityCommands(path);
     }
 
     return 0;
